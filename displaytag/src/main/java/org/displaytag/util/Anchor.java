@@ -11,11 +11,14 @@
  */
 package org.displaytag.util;
 
+import org.displaytag.tags.TableTagParameters;
+
 /**
  * Anchor object used to output an html link (an &lt;a> tag).
  * @author Fabrizio Giustina
  * @version $Revision$ ($Author$)
  */
+@SuppressWarnings("unchecked")
 public class Anchor
 {
 
@@ -109,6 +112,12 @@ public class Anchor
      */
     public String getOpenTag()
     {
+   	 /**** WebJET ****/
+       if (this.href!=null && this.href.toString().indexOf(TableTagParameters.PARAMETER_EXPORTING+"=1")!=-1)
+       {
+     	  this.attributeMap.put("onclick", "window.open(this.href); return false;");
+     	  this.attributeMap.put("onkeypress", "window.open(this.href); return false;");
+       }
 
         // shortcut for links with no attributes
         if (this.attributeMap.size() == 0)
@@ -124,6 +133,15 @@ public class Anchor
         buffer.append(this.attributeMap);
 
         buffer.append(TagConstants.TAG_CLOSE);
+
+        //WebJET odstranenie jsessionid
+        int startIndex = buffer.indexOf(";jsessionid");
+        if(startIndex != -1)
+        {
+      	  int endIndex = buffer.indexOf("?", startIndex);
+      	  if(endIndex == -1) endIndex = buffer.length();
+      	  buffer.replace(startIndex, endIndex, "");
+        }
 
         return buffer.toString();
     }
@@ -141,6 +159,7 @@ public class Anchor
      * returns the full &lt;a href="">body&lt;/a>.
      * @return String html link
      */
+    @Override
     public String toString()
     {
         return getOpenTag() + this.linkText + getCloseTag();

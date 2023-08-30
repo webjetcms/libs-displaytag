@@ -41,7 +41,7 @@ public final class ExportDelegate
     private static Log log = LogFactory.getLog(ExportDelegate.class);
 
     /**
-     * Donìt instantiate.
+     * Donï¿½t instantiate.
      */
     private ExportDelegate()
     {
@@ -56,7 +56,7 @@ public final class ExportDelegate
      * @param request ServletRequest
      * @throws IOException exception thrown by response writer/outputStream
      */
-    protected static void writeExport(HttpServletResponse response, ServletRequest request,
+    public static void writeExport(HttpServletResponse response, ServletRequest request,
         BufferedResponseWrapper wrapper) throws IOException
     {
 

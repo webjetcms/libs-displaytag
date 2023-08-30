@@ -11,38 +11,46 @@
  */
 package org.displaytag.export;
 
-import java.awt.Color;
+//import java.awt.Color;
 import java.io.OutputStream;
-import java.util.Iterator;
+//import java.util.Iterator;
+//import java.util.List;
 
 import javax.servlet.jsp.JspException;
 
-import org.apache.commons.lang.ObjectUtils;
-import org.apache.commons.lang.StringUtils;
+/*
+import com.Xlowagie.text.BadElementException;
+import com.Xlowagie.text.Cell;
+import com.Xlowagie.text.Chunk;
+import com.Xlowagie.text.Document;
+import com.Xlowagie.text.Element;
+import com.Xlowagie.text.Font;
+import com.Xlowagie.text.FontFactory;
+import com.Xlowagie.text.HeaderFooter;
+import com.Xlowagie.text.PageSize;
+import com.Xlowagie.text.Paragraph;
+import com.Xlowagie.text.Phrase;
+import com.Xlowagie.text.Rectangle;
+import com.Xlowagie.text.Table;
+import com.Xlowagie.text.pdf.PdfWriter;
+*/
+
+//import org.apache.commons.lang.ObjectUtils;
+//import org.apache.commons.lang.StringUtils;
 import org.displaytag.Messages;
 import org.displaytag.exception.BaseNestableJspTagException;
 import org.displaytag.exception.SeverityEnum;
-import org.displaytag.model.Column;
-import org.displaytag.model.ColumnIterator;
-import org.displaytag.model.HeaderCell;
-import org.displaytag.model.Row;
-import org.displaytag.model.RowIterator;
+//import org.displaytag.model.Column;
+//import org.displaytag.model.ColumnIterator;
+//import org.displaytag.model.HeaderCell;
+//import org.displaytag.model.Row;
+//import org.displaytag.model.RowIterator;
 import org.displaytag.model.TableModel;
-import org.displaytag.util.TagConstants;
+//import org.displaytag.properties.TableProperties;
+//import org.displaytag.util.TagConstants;
 
-import com.lowagie.text.BadElementException;
-import com.lowagie.text.Cell;
-import com.lowagie.text.Chunk;
-import com.lowagie.text.Document;
-import com.lowagie.text.Element;
-import com.lowagie.text.Font;
-import com.lowagie.text.FontFactory;
-import com.lowagie.text.HeaderFooter;
-import com.lowagie.text.PageSize;
-import com.lowagie.text.Phrase;
-import com.lowagie.text.Rectangle;
-import com.lowagie.text.Table;
-import com.lowagie.text.pdf.PdfWriter;
+//import sk.iway.iwcm.Tools;
+//import sk.iway.iwcm.common.SearchTools;
 
 
 /**
@@ -50,7 +58,7 @@ import com.lowagie.text.pdf.PdfWriter;
  * probably will need to write a custom export class with a specific layout.
  * @author Ivan Markov
  * @author Fabrizio Giustina
- * @version $Revision$ ($Author$)
+ * @version $Revision: 1.3 $ ($Author: jeeff $)
  */
 public class PdfView implements BinaryExportView
 {
@@ -79,16 +87,17 @@ public class PdfView implements BinaryExportView
      * This is the table, added as an Element to the PDF document. It contains all the data, needed to represent the
      * visible table into the PDF
      */
-    private Table tablePDF;
+    //private Table tablePDF;
 
     /**
      * The default font used in the document.
      */
-    private Font smallFont;
+    //private Font smallFont;
 
     /**
      * @see org.displaytag.export.ExportView#setParameters(TableModel, boolean, boolean, boolean)
      */
+    @Override
     public void setParameters(TableModel tableModel, boolean exportFullList, boolean includeHeader,
         boolean decorateValues)
     {
@@ -102,17 +111,16 @@ public class PdfView implements BinaryExportView
      * Initialize the main info holder table.
      * @throws BadElementException for errors during table initialization
      */
-    protected void initTable() throws BadElementException
+    protected void initTable() //throws BadElementException
     {
-        tablePDF = new Table(this.model.getNumberOfColumns());
+        /*tablePDF = new Table(this.model.getNumberOfColumns());
         tablePDF.setDefaultVerticalAlignment(Element.ALIGN_TOP);
         tablePDF.setCellsFitPage(true);
         tablePDF.setWidth(100);
-
         tablePDF.setPadding(2);
         tablePDF.setSpacing(0);
-
-        smallFont = FontFactory.getFont(FontFactory.HELVETICA, 7, Font.NORMAL, new Color(0, 0, 0));
+        FontFactory.defaultEncoding="windows-1250";
+        smallFont = FontFactory.getFont(FontFactory.HELVETICA, 7, Font.NORMAL, new Color(0, 0, 0));*/
 
     }
 
@@ -120,6 +128,7 @@ public class PdfView implements BinaryExportView
      * @see org.displaytag.export.BaseExportView#getMimeType()
      * @return "application/pdf"
      */
+    @Override
     public String getMimeType()
     {
         return "application/pdf"; //$NON-NLS-1$
@@ -130,21 +139,25 @@ public class PdfView implements BinaryExportView
      * @throws JspException for errors during value retrieving from the table model
      * @throws BadElementException IText exception
      */
-    protected void generatePDFTable() throws JspException, BadElementException
+    protected void generatePDFTable() throws JspException //, BadElementException
     {
+        /*
         if (this.header)
         {
             generateHeaders();
         }
         tablePDF.endHeaders();
         generateRows();
+        */
     }
 
     /**
      * @see org.displaytag.export.BinaryExportView#doExport(OutputStream)
      */
+    @Override
     public void doExport(OutputStream out) throws JspException
     {
+        /*
         try
         {
             // Initialize the table with the appropriate number of columns
@@ -158,12 +171,44 @@ public class PdfView implements BinaryExportView
             footer.setAlignment(Element.ALIGN_CENTER);
 
             PdfWriter.getInstance(document, out);
+            document.setFooter(footer);
 
             // Fill the virtual PDF table with the necessary data
             generatePDFTable();
             document.open();
-            document.setFooter(footer);
+
+
+            //MBO: Umoznuje pridat riadky pred a za tabulku do exportu
+
+            TableProperties tableProperties = this.model.getProperties();
+            for (int i=0;i<10;i++)
+            {
+            	String tableCaption = Tools.getStringValue(tableProperties.getProperty("export.pdf.table.before"+(i>0?i:"")),
+            			tableProperties.getProperty("export.table.before"+(i>0?i:"")));
+            	if (Tools.isNotEmpty(tableCaption))
+            		document.add(new Paragraph(tableCaption));
+            	else
+            		if (i==0)
+            			continue;
+            		else
+            			break;
+            }
+
             document.add(this.tablePDF);
+
+            for (int i=0; i<10; i++)
+            {
+	            String tableFooter = Tools.getStringValue(tableProperties.getProperty("export.pdf.table.after"+(i>0?i:"")),
+	            		tableProperties.getProperty("export.table.after"+(i>0?i:"")));
+	            if (Tools.isNotEmpty(tableFooter))
+	            	document.add(new Paragraph(tableFooter));
+	            else
+	            	if (i==0)
+            			continue;
+            		else
+            			break;
+            }
+
             document.close();
 
         }
@@ -171,21 +216,24 @@ public class PdfView implements BinaryExportView
         {
             throw new PdfGenerationException(e);
         }
+        */
     }
 
     /**
      * Generates the header cells, which persist on every page of the PDF document.
      * @throws BadElementException IText exception
      */
-    protected void generateHeaders() throws BadElementException
+    @SuppressWarnings("unchecked")
+	protected void generateHeaders() //throws BadElementException
     {
-        Iterator iterator = this.model.getHeaderCellList().iterator();
+        /*
+        Iterator<HeaderCell> iterator = ((List<HeaderCell>) this.model.getHeaderCellList()).iterator();
 
         while (iterator.hasNext())
         {
             HeaderCell headerCell = (HeaderCell) iterator.next();
 
-            String columnHeader = headerCell.getTitle();
+            String columnHeader = SearchTools.htmlToPlain(headerCell.getTitle());
 
             if (columnHeader == null)
             {
@@ -198,6 +246,7 @@ public class PdfView implements BinaryExportView
             tablePDF.addCell(hdrCell);
 
         }
+        */
     }
 
     /**
@@ -205,8 +254,9 @@ public class PdfView implements BinaryExportView
      * @throws JspException for errors during value retrieving from the table model
      * @throws BadElementException errors while generating content
      */
-    protected void generateRows() throws JspException, BadElementException
+    protected void generateRows() throws JspException //, BadElementException
     {
+        /*
         // get the correct iterator (full or partial list according to the exportFull field)
         RowIterator rowIterator = this.model.getRowIterator(this.exportFull);
         // iterator on rows
@@ -222,12 +272,23 @@ public class PdfView implements BinaryExportView
                 Column column = columnIterator.nextColumn();
 
                 // Get the value to be displayed for the column
-                Object value = column.getValue(this.decorated);
-
-                Cell cell = getCell(ObjectUtils.toString(value));
+               Object value = column.getValue(this.decorated);
+//***************************************************************************************PRIDANE
+               String text = "";
+         		if(value != null) {
+         			text = ObjectUtils.toString(value);
+         			text = Tools.unescapeHtmlEntities(text);
+         			text = SearchTools.htmlToPlain(text).trim();
+         			if(text.endsWith("&nbsp;")) {
+            			text=text.substring(0,text.length()-6);
+         			}
+         		}
+//*****************************************************************************************
+                Cell cell = getCell(text);//Cell cell = getCell(value);
                 tablePDF.addCell(cell);
             }
         }
+        */
     }
 
     /**
@@ -236,18 +297,18 @@ public class PdfView implements BinaryExportView
      * @return Cell
      * @throws BadElementException errors while generating content
      */
-    private Cell getCell(String value) throws BadElementException
+    /*private Cell getCell(String value) throws BadElementException
     {
         Cell cell = new Cell(new Chunk(StringUtils.trimToEmpty(value), smallFont));
         cell.setVerticalAlignment(Element.ALIGN_TOP);
         cell.setLeading(8);
         return cell;
-    }
+    }*/
 
     /**
      * Wraps IText-generated exceptions.
      * @author Fabrizio Giustina
-     * @version $Revision$ ($Author$)
+     * @version $Revision: 1.3 $ ($Author: jeeff $)
      */
     static class PdfGenerationException extends BaseNestableJspTagException
     {
@@ -269,6 +330,7 @@ public class PdfView implements BinaryExportView
         /**
          * @see org.displaytag.exception.BaseNestableJspTagException#getSeverity()
          */
+        @Override
         public SeverityEnum getSeverity()
         {
             return SeverityEnum.ERROR;

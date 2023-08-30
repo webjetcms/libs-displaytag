@@ -13,11 +13,11 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.poi.hssf.usermodel.HSSFCell;
 import org.apache.poi.hssf.usermodel.HSSFCellStyle;
 import org.apache.poi.hssf.usermodel.HSSFFont;
-import org.apache.poi.hssf.usermodel.HSSFRichTextString;
 import org.apache.poi.hssf.usermodel.HSSFRow;
 import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
-import org.apache.poi.hssf.util.HSSFColor;
+import org.apache.poi.hssf.util.HSSFColor.HSSFColorPredefined;
+import org.apache.poi.ss.usermodel.FillPatternType;
 import org.displaytag.Messages;
 import org.displaytag.exception.BaseNestableJspTagException;
 import org.displaytag.exception.SeverityEnum;
@@ -28,13 +28,18 @@ import org.displaytag.model.HeaderCell;
 import org.displaytag.model.Row;
 import org.displaytag.model.RowIterator;
 import org.displaytag.model.TableModel;
+import org.displaytag.properties.TableProperties;
+
+import sk.iway.iwcm.DB;
+import sk.iway.iwcm.Tools;
+import sk.iway.iwcm.common.SearchTools;
 
 
 /**
  * Excel exporter using POI HSSF.
  * @author Fabrizio Giustina
  * @author rapruitt
- * @version $Revision$ ($Author$)
+ * @version $Revision: 1.4 $ ($Author: thaber $)
  */
 public class ExcelHssfView implements BinaryExportView
 {
@@ -60,8 +65,14 @@ public class ExcelHssfView implements BinaryExportView
     private boolean decorated;
 
     /**
+     * Generated sheet.
+     */
+    private HSSFSheet sheet;
+
+    /**
      * @see org.displaytag.export.ExportView#setParameters(TableModel, boolean, boolean, boolean)
      */
+    @Override
     public void setParameters(TableModel tableModel, boolean exportFullList, boolean includeHeader,
         boolean decorateValues)
     {
@@ -75,6 +86,7 @@ public class ExcelHssfView implements BinaryExportView
      * @return "application/vnd.ms-excel"
      * @see org.displaytag.export.BaseExportView#getMimeType()
      */
+    @Override
     public String getMimeType()
     {
         return "application/vnd.ms-excel"; //$NON-NLS-1$
@@ -83,36 +95,82 @@ public class ExcelHssfView implements BinaryExportView
     /**
      * @see org.displaytag.export.BinaryExportView#doExport(OutputStream)
      */
+    @Override
     public void doExport(OutputStream out) throws JspException
     {
         try
         {
             HSSFWorkbook wb = new HSSFWorkbook();
-            HSSFSheet sheet = wb.createSheet("-");
+            sheet = wb.createSheet("-");
 
             int rowNum = 0;
             int colNum = 0;
+
+            HSSFCellStyle highLightStyle = wb.createCellStyle();
+            highLightStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            highLightStyle.setFillForegroundColor(HSSFColorPredefined.BLUE_GREY.getIndex());
+
+            HSSFFont bold = wb.createFont();
+            bold.setBold(true);
+            bold.setColor(HSSFColorPredefined.BLACK.getIndex());
+            highLightStyle.setFont(bold);
+
+            HSSFCellStyle headerStyle = wb.createCellStyle();
+
+            headerStyle.setFont(bold);
+
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setFillForegroundColor(HSSFColorPredefined.GREY_25_PERCENT.getIndex());
+            //headerStyle.setFillBackgroundColor(new HSSFColor.RED().getIndex());
+
+
+            // pozri ci nieje treba pridat nastaveny text pred a za tabulku
+            TableProperties tableProperties = this.model.getProperties();
+            boolean pridajPrazdnyRiadok=false;
+            for (int i=0;i<10;i++)
+            {
+	            String caption = Tools.getStringValue(tableProperties.getProperty("export.excel.table.before"+(i>0?i:"")),
+	            		tableProperties.getProperty("export.table.before"+(i>0?i:"")));
+	            if (Tools.isNotEmpty(caption))
+	            {
+	            	HSSFRow xlsRow = sheet.createRow(rowNum++);
+	            	HSSFCell cell =  xlsRow.createCell(0);
+	            	cell.setCellValue(caption);
+	            	pridajPrazdnyRiadok=true;
+	            }
+	            else
+	            {
+	            	if (i==0)
+            			continue;
+            		else
+            		{
+            			if (pridajPrazdnyRiadok)
+    	            	{
+    	            		//za posledny riadok pridaj jeden prazdny riadok
+    	            		HSSFRow xlsRow2 = sheet.createRow(rowNum++);
+    		            	HSSFCell cell2 =  xlsRow2.createCell(0);
+    		            	cell2.setCellValue("");
+    	            	}
+            			break;
+            		}
+
+
+	            }
+            }
 
             if (this.header)
             {
                 // Create an header row
                 HSSFRow xlsRow = sheet.createRow(rowNum++);
 
-                HSSFCellStyle headerStyle = wb.createCellStyle();
-                headerStyle.setFillPattern(HSSFCellStyle.FINE_DOTS);
-                headerStyle.setFillBackgroundColor(HSSFColor.BLUE_GREY.index);
-                HSSFFont bold = wb.createFont();
-                bold.setBoldweight(HSSFFont.BOLDWEIGHT_BOLD);
-                bold.setColor(HSSFColor.WHITE.index);
-                headerStyle.setFont(bold);
-
-                Iterator iterator = this.model.getHeaderCellList().iterator();
+                @SuppressWarnings("unchecked")
+                Iterator<HeaderCell> iterator = (Iterator<HeaderCell>)this.model.getHeaderCellList().iterator();
 
                 while (iterator.hasNext())
                 {
                     HeaderCell headerCell = (HeaderCell) iterator.next();
 
-                    String columnHeader = headerCell.getTitle();
+                    String columnHeader = SearchTools.htmlToPlain(headerCell.getTitle());
 
                     if (columnHeader == null)
                     {
@@ -120,7 +178,8 @@ public class ExcelHssfView implements BinaryExportView
                     }
 
                     HSSFCell cell = xlsRow.createCell(colNum++);
-                    cell.setCellValue(new HSSFRichTextString(columnHeader));
+                    //cell.setEncoding(HSSFCell.ENCODING_UTF_16);
+                    cell.setCellValue(columnHeader);
                     cell.setCellStyle(headerStyle);
                 }
             }
@@ -133,7 +192,20 @@ public class ExcelHssfView implements BinaryExportView
             {
                 Row row = rowIterator.next();
                 HSSFRow xlsRow = sheet.createRow(rowNum++);
+                boolean highLight = false;
                 colNum = 0;
+
+                try
+					 {
+               	 if (row.getCellList().size()>0 && row.getCellList().get(0)!=null && row.getCellList().get(0).toString().contains("\"excel.highlight\""))
+                   {
+                  	 highLight  = true;
+                   }
+					 }
+					 catch (Exception e)
+					 {
+						sk.iway.iwcm.Logger.error(e);
+					 }
 
                 // iterator on columns
                 ColumnIterator columnIterator = row.getColumnIterator(this.model.getHeaderCellList());
@@ -146,49 +218,105 @@ public class ExcelHssfView implements BinaryExportView
                     Object value = column.getValue(this.decorated);
 
                     HSSFCell cell = xlsRow.createCell(colNum++);
+                    //cell.setEncoding(HSSFCell.ENCODING_UTF_16);
 
-                    writeCell(value, cell);
+                    if (highLight)
+                    {
+                  	  cell.setCellStyle(highLightStyle);
+                    }
+
+                    if (value instanceof Number)
+                    {
+                        Number num = (Number) value;
+                        cell.setCellValue(num.doubleValue());
+                    }
+                    else if (value instanceof Date)
+                    {
+                        cell.setCellValue((Date) value);
+                    }
+                    else if (value instanceof Calendar)
+                    {
+                        cell.setCellValue((Calendar) value);
+                    }
+                    else
+                    {
+                  	  String valueStr = escapeColumnValue(value);
+
+                  	  if (valueStr.contains("=") && valueStr.toLowerCase().contains("cmd"))
+                      {
+                          //ochrana pred generovanim bunky s =cmd|’/c calc.exe’!A1 a vykonanie prikazu po stiahnuti XLS
+                          valueStr = Tools.replace(valueStr, "=", "-");
+                      }
+
+                  	  if (valueStr.startsWith("="))
+                  	  {
+                  		  try
+                  		  {
+                  		    cell.setCellFormula(valueStr.substring(1));
+                  		  }
+                  		  catch (Exception ex)
+                  		  {
+                  			  sk.iway.iwcm.Logger.error(ex);
+                  			  cell.setCellValue(valueStr);
+                  		  }
+                  	  }
+                  	  else
+                  	  {
+                  		  //testni, ci to nahodou nie je cislo
+                     	  double cislo = Tools.getDoubleValue(valueStr, Double.MIN_VALUE);
+
+                     	  //prilis velke cisla asi budu skor telefonne, tu vypnem autodetekciu 0903123456
+                     	  if (valueStr.length()>8 || (valueStr.startsWith("0") && cislo > 1))
+                     	  {
+                     		  cislo = Double.MIN_VALUE;
+                     	  }
+
+                     	  if (cislo != Double.MIN_VALUE)
+                     	  {
+                     		  Number num = Double.valueOf(cislo);
+                     		  cell.setCellValue(num.doubleValue());
+                     	  }
+                     	  else
+                     	  {
+                     		  cell.setCellValue(DB.prepareString(valueStr, 32760));
+                     	  }
+                  	  }
+                    }
                 }
             }
-
-            // adjust the column widths
-            int colCount = 0;
-            while (colCount <= colNum)
+            pridajPrazdnyRiadok=true;
+            for (int i=0;i<10;i++)
             {
-                sheet.autoSizeColumn((short) colCount++);
-            }
+	            String afterTable = Tools.getStringValue(tableProperties.getProperty("export.table.after"+(i>0?i:"")),
+	            		tableProperties.getProperty("export.excel.table.after"+(i>0?i:"")));
+	            if (Tools.isNotEmpty(afterTable))
+	            {
+	            	if (pridajPrazdnyRiadok)
+	            	{
+	            		HSSFRow xlsRow2 = sheet.createRow(rowNum++);
+		            	HSSFCell cell2 =  xlsRow2.createCell(0);
+		            	cell2.setCellValue("");
+		            	pridajPrazdnyRiadok=false;
+	            	}
+	            	HSSFRow xlsRow = sheet.createRow(rowNum++);
+	            	HSSFCell cell =  xlsRow.createCell(0);
+	            	cell.setCellValue(afterTable);
 
+	            }
+	            else
+	            {
+	            	if (i==0)
+            			continue;
+            		else
+            			break;
+	            }
+            }
             wb.write(out);
+            wb.close();
         }
         catch (Exception e)
         {
             throw new ExcelGenerationException(e);
-        }
-    }
-
-    /**
-     * Write the value to the cell. Override this method if you have complex data types that may need to be exported.
-     * @param value the value of the cell
-     * @param cell the cell to write it to
-     */
-    protected void writeCell(Object value, HSSFCell cell)
-    {
-        if (value instanceof Number)
-        {
-            Number num = (Number) value;
-            cell.setCellValue(num.doubleValue());
-        }
-        else if (value instanceof Date)
-        {
-            cell.setCellValue((Date) value);
-        }
-        else if (value instanceof Calendar)
-        {
-            cell.setCellValue((Calendar) value);
-        }
-        else
-        {
-            cell.setCellValue(new HSSFRichTextString(escapeColumnValue(value)));
         }
     }
 
@@ -213,13 +341,16 @@ public class ExcelHssfView implements BinaryExportView
         returnString = StringUtils.replace(StringUtils.trim(returnString), "\\r", " ");
         // unescape so that \n gets back to newline
         returnString = StringEscapeUtils.unescapeJava(returnString);
+
+        //WebJET - vrat zobaciky nazad
+        returnString = Tools.unescapeHtmlEntities(returnString);
         return returnString;
     }
 
     /**
      * Wraps IText-generated exceptions.
      * @author Fabrizio Giustina
-     * @version $Revision$ ($Author$)
+     * @version $Revision: 1.4 $ ($Author: thaber $)
      */
     static class ExcelGenerationException extends BaseNestableJspTagException
     {
@@ -241,6 +372,7 @@ public class ExcelHssfView implements BinaryExportView
         /**
          * @see org.displaytag.exception.BaseNestableJspTagException#getSeverity()
          */
+        @Override
         public SeverityEnum getSeverity()
         {
             return SeverityEnum.ERROR;

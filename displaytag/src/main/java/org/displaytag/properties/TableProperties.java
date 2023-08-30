@@ -13,8 +13,15 @@ package org.displaytag.properties;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
 import java.text.Collator;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.MissingResourceException;
+import java.util.Properties;
+import java.util.ResourceBundle;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.jsp.PageContext;
@@ -26,16 +33,20 @@ import org.apache.commons.lang.UnhandledException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.displaytag.Messages;
-import org.displaytag.model.DefaultComparator;
 import org.displaytag.decorator.DecoratorFactory;
 import org.displaytag.decorator.DefaultDecoratorFactory;
 import org.displaytag.exception.FactoryInstantiationException;
 import org.displaytag.exception.TablePropertiesLoadException;
 import org.displaytag.localization.I18nResourceProvider;
 import org.displaytag.localization.LocaleResolver;
+import org.displaytag.model.DefaultComparator;
 import org.displaytag.util.DefaultRequestHelperFactory;
 import org.displaytag.util.ReflectHelper;
 import org.displaytag.util.RequestHelperFactory;
+
+import sk.iway.iwcm.Constants;
+import sk.iway.iwcm.Tools;
+import sk.iway.iwcm.i18n.Prop;
 
 
 /**
@@ -53,6 +64,7 @@ import org.displaytag.util.RequestHelperFactory;
  * @author rapruitt
  * @version $Revision$ ($Author$)
  */
+@SuppressWarnings({"rawtypes","unchecked"})
 public final class TableProperties implements Cloneable
 {
 
@@ -260,17 +272,17 @@ public final class TableProperties implements Cloneable
     public static final String PROPERTY_EXPORT_PREFIX = "export"; //$NON-NLS-1$
 
     /**
-     * prefix used to set the media decorator property name. The full property name is 
+     * prefix used to set the media decorator property name. The full property name is
      * <code>decorator.media.</code><em>[export type]</em>.
      */
     public static final String PROPERTY_DECORATOR_SUFFIX = "decorator"; //$NON-NLS-1$
 
     /**
-     * used to set the media decorator property name. The full property name is 
+     * used to set the media decorator property name. The full property name is
      * <code>decorator.media.</code><em>[export type]</em>
      */
     public static final String PROPERTY_DECORATOR_MEDIA = "media"; //$NON-NLS-1$
-    
+
     /**
      * property <code>export.types</code>: holds the list of export available export types.
      */
@@ -432,6 +444,7 @@ public final class TableProperties implements Cloneable
                 throw new TablePropertiesLoadException(TableProperties.class, DEFAULT_FILENAME, null);
             }
             defaultProperties.load(is);
+            is.close();
         }
         catch (IOException e)
         {
@@ -497,7 +510,7 @@ public final class TableProperties implements Cloneable
             {
                 try
                 {
-                    className = defaultUserProperties.getString(PROPERTY_CLASS_LOCALERESOLVER);
+                    className = "sk.iway.iwcm.system.DisplayTagLocaleResolver"; // defaultUserProperties.getString(PROPERTY_CLASS_LOCALERESOLVER);
                 }
                 catch (MissingResourceException e)
                 {
@@ -508,8 +521,8 @@ public final class TableProperties implements Cloneable
             // still null? load defaults
             if (className == null)
             {
-                Properties defaults = loadBuiltInProperties();
-                className = defaults.getProperty(PROPERTY_CLASS_LOCALERESOLVER);
+                //Properties defaults = loadBuiltInProperties();
+                className = "sk.iway.iwcm.system.DisplayTagLocaleResolver"; // defaults.getProperty(PROPERTY_CLASS_LOCALERESOLVER);
             }
 
             if (className != null)
@@ -517,7 +530,7 @@ public final class TableProperties implements Cloneable
                 try
                 {
                     Class classProperty = ReflectHelper.classForName(className);
-                    localeResolver = (LocaleResolver) classProperty.newInstance();
+                    localeResolver = (LocaleResolver) classProperty.getDeclaredConstructor().newInstance();
 
                     log.info(Messages.getString("TableProperties.classinitializedto", //$NON-NLS-1$
                         new Object[]{ClassUtils.getShortClassName(LocaleResolver.class), className}));
@@ -531,11 +544,11 @@ public final class TableProperties implements Cloneable
                             e.getMessage()}));
                 }
             }
-            else
+            /*else
             {
                 log.info(Messages.getString("TableProperties.noconfigured", //$NON-NLS-1$
                     new Object[]{ClassUtils.getShortClassName(LocaleResolver.class)}));
-            }
+            }*/
 
             // still null?
             if (localeResolver == null)
@@ -543,7 +556,7 @@ public final class TableProperties implements Cloneable
                 // fallback locale resolver
                 localeResolver = new LocaleResolver()
                 {
-
+               	 @Override
                     public Locale resolveLocale(HttpServletRequest request)
                     {
                         return request.getLocale();
@@ -607,6 +620,7 @@ public final class TableProperties implements Cloneable
      * Clones the properties as well.
      * @return a new clone of oneself
      */
+    @Override
     protected Object clone()
     {
         TableProperties twin;
@@ -623,6 +637,16 @@ public final class TableProperties implements Cloneable
         return twin;
     }
 
+    private String lng;
+
+    private TableProperties(String lng)
+    {
+   	 if ("cz".equals(lng)) lng = "cs";
+    	this.lng = lng;
+    	this.locale = new Locale(lng);  //Locale.getDefault();
+    	properties = loadBuiltInProperties();
+    }
+
     /**
      * Returns a new TableProperties instance for the given locale.
      * @param request HttpServletRequest needed to extract the locale to use. If null the default locale will be used.
@@ -630,25 +654,53 @@ public final class TableProperties implements Cloneable
      */
     public static TableProperties getInstance(HttpServletRequest request)
     {
-        Locale locale;
-        if (request != null)
-        {
-            locale = getLocaleResolverInstance().resolveLocale(request);
-        }
-        else
-        {
-            // for some configuration parameters locale doesn't matter
-            locale = Locale.getDefault();
-        }
 
-        TableProperties props = (TableProperties) prototypes.get(locale);
-        if (props == null)
-        {
-            TableProperties lprops = new TableProperties(locale);
-            prototypes.put(locale, lprops);
-            props = lprops;
-        }
-        return (TableProperties) props.clone();
+     /*Locale locale;
+     if (request != null)
+     {
+         locale = getLocaleResolverInstance().resolveLocale(request);
+     }
+     else
+     {
+         // for some configuration parameters locale doesn't matter
+         locale = Locale.getDefault();
+     }*/
+
+     /*TableProperties props = (TableProperties) prototypes.get(locale);
+     if (props == null)
+     {
+         TableProperties lprops = new TableProperties(locale);
+         prototypes.put(locale, lprops);
+         props = lprops;
+     }*/
+//**************************************************************************************************PRIDANE
+     String lng = Constants.getString("defaultLanguage");
+
+   	if (request != null)
+   	{
+	    	lng = request.getParameter("language");
+	    	if (lng == null)
+	    	{
+	    		lng = (String)request.getAttribute("PageLng");
+	    	}
+			if (lng == null)
+			{
+				lng = (String)request.getSession().getAttribute(Prop.SESSION_I18N_PROP_LNG);
+			}
+			if (lng == null)
+			{
+				lng = Constants.getString("defaultLanguage");
+			}
+   	}
+   	else
+   	{
+   		System.err.println("REQUEST JE NULL!!!! ");
+   	}
+//*************************************************************************************************
+
+   	return (new TableProperties(lng));
+
+     //return (TableProperties) props.clone();
     }
 
     /**
@@ -1182,7 +1234,7 @@ public final class TableProperties implements Cloneable
      */
     public I18nResourceProvider geResourceProvider()
     {
-        String className = getProperty(PROPERTY_CLASS_LOCALEPROVIDER);
+        String className = "sk.iway.iwcm.system.DisplayTagLocaleResolver"; // getProperty(PROPERTY_CLASS_LOCALEPROVIDER);
 
         if (resourceProvider == null)
         {
@@ -1191,7 +1243,7 @@ public final class TableProperties implements Cloneable
                 try
                 {
                     Class classProperty = ReflectHelper.classForName(className);
-                    resourceProvider = (I18nResourceProvider) classProperty.newInstance();
+                    resourceProvider = (I18nResourceProvider) classProperty.getDeclaredConstructor().newInstance();
 
                     log.info(Messages.getString("TableProperties.classinitializedto", //$NON-NLS-1$
                         new Object[]{ClassUtils.getShortClassName(I18nResourceProvider.class), className}));
@@ -1205,11 +1257,11 @@ public final class TableProperties implements Cloneable
                             e.getMessage()}));
                 }
             }
-            else
+            /*else
             {
                 log.info(Messages.getString("TableProperties.noconfigured", //$NON-NLS-1$
                     new Object[]{ClassUtils.getShortClassName(I18nResourceProvider.class)}));
-            }
+            }*/
 
             // still null?
             if (resourceProvider == null)
@@ -1217,7 +1269,7 @@ public final class TableProperties implements Cloneable
                 // fallback provider, no i18n
                 resourceProvider = new I18nResourceProvider()
                 {
-
+               	 @Override
                     // Always returns null
                     public String getResource(String titleKey, String property, Tag tag, PageContext context)
                     {
@@ -1235,10 +1287,27 @@ public final class TableProperties implements Cloneable
      * @param key property name
      * @return property value or <code>null</code> if property is not found
      */
-    private String getProperty(String key)
+    public String getProperty(String key)
     {
-        return this.properties.getProperty(key);
+    	//***********************************************************************************UPRAVENE
+   	String value = properties.getProperty("changed."+key);
+   	if (Tools.isNotEmpty(value)) return value;
+   	value = properties.getProperty("changed.displaytag."+key);
+   	if (Tools.isNotEmpty(value)) return value;
+
+    	Prop prop = Prop.getInstance(Constants.getServletContext(), lng, false);
+    	value = prop.getText("displaytag."+key);
+
+    	if (("displaytag."+key).equals(value))
+    	{
+
+    		value = properties.getProperty(key);
+    	}
+
+    	return(value);
+    	//*************************************************************************************
     }
+
 
     /**
      * Sets a property.
@@ -1247,7 +1316,7 @@ public final class TableProperties implements Cloneable
      */
     public void setProperty(String key, String value)
     {
-        this.properties.setProperty(key, value);
+   	 this.properties.setProperty("changed."+key, value);
     }
 
     /**
@@ -1286,7 +1355,7 @@ public final class TableProperties implements Cloneable
         try
         {
             Class classProperty = ReflectHelper.classForName(className);
-            instance = classProperty.newInstance();
+            instance = classProperty.getDeclaredConstructor().newInstance();
             objectCache.put(key, instance);
             return instance;
         }
@@ -1312,7 +1381,7 @@ public final class TableProperties implements Cloneable
         {
             // Don't care, use default
             log.warn(Messages.getString("TableProperties.invalidvalue", //$NON-NLS-1$
-                new Object[]{key, getProperty(key), new Integer(defaultValue)}));
+                new Object[]{key, getProperty(key), Integer.valueOf(defaultValue)}));
         }
 
         return defaultValue;
@@ -1341,13 +1410,13 @@ public final class TableProperties implements Cloneable
 
     public Comparator getDefaultComparator()
     {
-        String className = getProperty(PROPERTY_DEFAULT_COMPARATOR);  
+        String className = getProperty(lng);
         if (className != null)
         {
             try
             {
                 Class classProperty = ReflectHelper.classForName(className);
-                return (Comparator) classProperty.newInstance();
+                return (Comparator) classProperty.getDeclaredConstructor().newInstance();
             }
             catch (Throwable e)
             {
