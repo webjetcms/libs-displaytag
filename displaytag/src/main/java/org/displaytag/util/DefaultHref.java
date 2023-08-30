@@ -29,6 +29,7 @@ import org.apache.commons.lang.builder.HashCodeBuilder;
  * @author Fabrizio Giustina
  * @version $Revision$ ($Author$)
  */
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class DefaultHref implements Href
 {
 
@@ -65,6 +66,7 @@ public class DefaultHref implements Href
     /**
      * @see org.displaytag.util.Href#setFullUrl(java.lang.String)
      */
+    @Override
     public void setFullUrl(String baseUrl)
     {
         this.url = null;
@@ -162,6 +164,7 @@ public class DefaultHref implements Href
      * @param value Object
      * @return this Href instance, useful for concatenation.
      */
+    @Override
     public Href addParameter(String name, Object value)
     {
         this.parameters.put(name, ObjectUtils.toString(value, null));
@@ -172,6 +175,7 @@ public class DefaultHref implements Href
      * Removes a parameter from the href.
      * @param name String
      */
+    @Override
     public void removeParameter(String name)
     {
         // warning, param names are escaped
@@ -184,9 +188,10 @@ public class DefaultHref implements Href
      * @param value int
      * @return this Href instance, useful for concatenation.
      */
+    @Override
     public Href addParameter(String name, int value)
     {
-        this.parameters.put(name, new Integer(value));
+        this.parameters.put(name, Integer.valueOf(value));
         return this;
     }
 
@@ -194,6 +199,7 @@ public class DefaultHref implements Href
      * Getter for the map containing link parameters. The returned map is always a copy and not the original instance.
      * @return parameter Map (copy)
      */
+    @Override
     public Map getParameterMap()
     {
         Map copyMap = new HashMap(this.parameters.size());
@@ -206,6 +212,7 @@ public class DefaultHref implements Href
      * added. Any parameter already present in the href object is removed.
      * @param parametersMap Map containing parameters
      */
+    @Override
     public void setParameterMap(Map parametersMap)
     {
         // create a new HashMap
@@ -220,6 +227,7 @@ public class DefaultHref implements Href
      * added. Parameters in the original href are kept and not overridden.
      * @param parametersMap Map containing parameters
      */
+    @Override
     public void addParameterMap(Map parametersMap)
     {
         // handle nulls
@@ -265,6 +273,7 @@ public class DefaultHref implements Href
      * Getter for the base url (without parameters).
      * @return String
      */
+    @Override
     public String getBaseUrl()
     {
         return this.url;
@@ -274,6 +283,7 @@ public class DefaultHref implements Href
      * Returns the URI anchor.
      * @return anchor or <code>null</code> if no anchor has been set.
      */
+    @Override
     public String getAnchor()
     {
         return this.anchor;
@@ -283,6 +293,7 @@ public class DefaultHref implements Href
      * Setter for the URI anchor.
      * @param name string to be used as anchor name (without #).
      */
+    @Override
     public void setAnchor(String name)
     {
         this.anchor = name;
@@ -292,6 +303,7 @@ public class DefaultHref implements Href
      * toString: output the full url with parameters.
      * @return String
      */
+    @Override
     public String toString()
     {
         StringBuffer buffer = new StringBuffer(30);
@@ -346,13 +358,27 @@ public class DefaultHref implements Href
             buffer.append('#');
             buffer.append(this.anchor);
         }
+        //WebJET odstranenie jsessionid ***PRIDANE
+        if (this.url.startsWith("javascript:"))
+        {
+      	  buffer.append("')");
+        }
 
+        int startIndex = buffer.indexOf(";jsessionid");
+        if(startIndex != -1)
+        {
+      	  int endIndex = buffer.indexOf("?", startIndex);
+      	  if(endIndex == -1) endIndex = buffer.length();
+      	  buffer.replace(startIndex, endIndex, "");
+        }
+        //****************************************************************************
         return buffer.toString();
     }
 
     /**
      * @see java.lang.Object#clone()
      */
+    @Override
     public Object clone()
     {
         final DefaultHref href;
@@ -372,6 +398,7 @@ public class DefaultHref implements Href
     /**
      * @see java.lang.Object#equals(Object)
      */
+    @Override
     public boolean equals(Object object)
     {
         if (!(object instanceof DefaultHref))
@@ -387,6 +414,7 @@ public class DefaultHref implements Href
     /**
      * @see java.lang.Object#hashCode()
      */
+    @Override
     public int hashCode()
     {
         return new HashCodeBuilder(1313733113, -431360889)
